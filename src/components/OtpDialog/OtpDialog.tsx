@@ -5,22 +5,43 @@ import {
   DialogContent,
   DialogActions,
   Typography,
-  Button,
-  Alert,
+  Button
 } from "@mui/material";
 import { Input as BaseInput } from '@mui/base/Input';
 import { Box, styled } from '@mui/system';
 
 interface OtpDialogProps {
+  apiUrl:string;
   open: boolean;
-  onClose: () => void;
+  onClose: (otp:string) => void;
+  config: Config;
 }
 
-export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
+interface Config {
+  title?: string;
+  messageOne?: string;
+  messageTwo?: string;
+  sendButton?: string;
+  errorMessage?: string;
+  errorTitle?: string;
+}
+
+export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose, config={}, apiUrl }) => {
+  const defaultConfig:Config={
+    title:"Autenticación de Dos Factores",
+    messageOne: "Presiona el botón Generar Otp para recibir un código de verificación.",
+    messageTwo: "Ingrese el código recibido: ",
+    sendButton: "Continuar",
+    errorMessage: "Código de verificación inválido",
+    errorTitle: "Error de Autenticación"
+  };
+  const finalConfig={...defaultConfig,...config}
   const [step, setStep] = useState<'generate' | 'verify'>('generate');
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
   const [loading, setLoading] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [apiData, setApiData] = useState('');
+
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -39,12 +60,18 @@ export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
 
   const handleGenerateOtp = () => {
     setLoading(true);
-    console.log("OTP generado (simulado)");
-    setTimeout(() => {
-      setLoading(false);
-      setStep('verify');
-      setOtp(Array(6).fill(''));
-    }, 1000);
+    fetch(apiUrl)
+      .then(res => res.json())
+      .then((data) => {
+        setApiData(data);
+        setLoading(false);
+        setStep('verify');
+        setOtp(Array(6).fill(''));
+      })
+      .catch((error) => {
+        alert("Error en API:" + error);
+        setLoading(false);
+      });
   };
 
   const handleConfirm = () => {
@@ -62,7 +89,7 @@ export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
     console.log("Dialog closed with action:", action, "OTP:", code || '');
     setStep('generate');
     setOtp(Array(6).fill(''));
-    onClose();
+    onClose(otp.join(''));
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
@@ -120,7 +147,7 @@ export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
   const renderGenerateStep = () => (
     <>
       <DialogContent>
-        <Typography>Presiona el botón para recibir un código de verificación.</Typography>
+        <Typography>{finalConfig.messageOne}</Typography>
       </DialogContent>
       <DialogActions>
         <Button onClick={() => handleClose('cancel')} color="secondary">
@@ -136,7 +163,7 @@ export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
   const renderVerifyStep = () => (
     <>
       <DialogContent>
-        <Typography>Ingrese el código recibido:</Typography>
+        <Typography>{finalConfig.messageTwo}</Typography>
         {OTPInputs()}
       </DialogContent>
       <DialogActions>
@@ -148,7 +175,7 @@ export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
           color="primary"
           disabled={otp.some((digit) => digit === '')}
         >
-          Continuar
+          {finalConfig.sendButton}
         </Button>
       </DialogActions>
     </>
@@ -157,7 +184,7 @@ export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
   return (
     <>
       <Dialog open={open} onClose={() => handleClose('close')} maxWidth="xs" fullWidth>
-        <DialogTitle>Autenticación de Dos Factores</DialogTitle>
+        <DialogTitle>{finalConfig.title}</DialogTitle>
         {step === 'generate' ? renderGenerateStep() : renderVerifyStep()}
       </Dialog>
       <Dialog
@@ -166,10 +193,10 @@ export const OtpDialog: React.FC<OtpDialogProps> = ({ open, onClose }) => {
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Error</DialogTitle>
+        <DialogTitle>{finalConfig.errorTitle}</DialogTitle>
         <DialogContent>
           <Typography color="error">
-            El código ingresado es incorrecto. Intenta nuevamente.
+            {finalConfig.errorMessage}
           </Typography>
         </DialogContent>
         <DialogActions>
